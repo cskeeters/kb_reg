@@ -92,11 +92,6 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
             }
 
             run_kb_reg(".", "");
-            string cmd = format("printf '' | {} -k .", KB_REG_PATH);
-            int ret = system(cmd.c_str());
-            if (ret != 0) {
-                error("Error running: {}", cmd);
-            }
             info("Initialized keyboard");
         }
 
