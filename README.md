@@ -359,7 +359,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record)
     if (keycode == KC_RGUI) {
         rgui_pressed = record->event.pressed;
 
-        // ignore all events with right mod
+        // ignore all events associated with the right gui key itself.
         return false;
     }
 
@@ -393,7 +393,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record)
                 }
             }
         }
-        // ignore all events with right mod
+        // ignore all events when right gui is currently pressed
         return false;
     }
 
