@@ -367,15 +367,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record)
 
         if (!record->event.pressed) {
 
-            dprintf("MODS: %#08X\n", get_mods());
-            dprintf("RALT: %#08X\n", MOD_BIT(KC_RALT));
-            dprintf("RGUI: %#08X\n", MOD_BIT(KC_RGUI));
-            dprintf("RSFT: %#08X\n", MOD_BIT(KC_RSFT));
-
-            dprintf("LSFT: %s\n", ((get_mods() & MOD_BIT(KC_LSFT)) != 0) ? "true" : "false");
-            dprintf("RSFT: %s\n", ((get_mods() & MOD_BIT(KC_RSFT)) != 0) ? "true" : "false");
-            dprintf("EXPR: %s\n", (((get_mods() & MOD_BIT(KC_LSFT)) != 0) || ((get_mods() & MOD_BIT(KC_RSFT)) != 0))  ? "true" : "false");
-
             if ((get_mods() & MOD_BIT(KC_RSFT)) != 0) {
                 kb_register_next_keycode = keycode;
                 dprintf("Set kb_register_next_keycode to %04X\n", kb_register_next_keycode);
