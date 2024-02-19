@@ -46,6 +46,10 @@ Create folder for log files
 Create `.kb_detect.toml`
 
 ```toml
+# If you install to a custom location, you need to update the path to kb_reg here.
+# Otherwise kb_detect will default to /usr/local/bin/kb_reg
+# kb_reg_path = "/usr/bin/kb_reg"
+
 [[keyboards]]
 vendor = 0x504b
 product = 0x707c

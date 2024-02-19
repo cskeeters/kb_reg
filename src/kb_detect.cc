@@ -15,11 +15,11 @@ using namespace std::filesystem;
 using namespace fmt;
 using namespace spdlog;
 
-#define KB_REG_PATH "/usr/local/bin/kb_reg"
-
 libusb_device_handle *handle = nullptr;
 
 volatile bool exit_flag{false};
+
+const string default_kb_reg_path{"/usr/local/bin/kb_reg"};
 
 void handle_signal(int sig) {
    // INT can be issued from a terminal only
@@ -56,8 +56,8 @@ string get_log_path() {
     return format("{}/.local/log/kb_detect.log", getenv("HOME"));
 }
 
-void run_kb_reg(const string &key, const string &value) {
-    string cmd = format("printf '{}' | {} -k {}", value.c_str(), KB_REG_PATH, key);
+void run_kb_reg(const string &key, const string &value, const string &kb_reg_path) {
+    string cmd = format("printf '{}' | {} -k {}", value.c_str(), kb_reg_path, key);
 
     int ret = system(cmd.c_str());
     if (ret != 0) {
@@ -83,15 +83,20 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 
         if (is_custom_keyboard(tbl, desc.idVendor, desc.idProduct)) {
 
+            string kb_reg_path = default_kb_reg_path;
+            if (!!tbl["kb_reg_path"]) {
+                kb_reg_path = tbl["kb_reg_path"].value<std::string>().value();
+            }
+
             auto keys = tbl["keys"].as_table();
             for (auto pair : *keys) {
                 string key = string(pair.first.str());
                 string value = pair.second.value_or(""s);
 
-                run_kb_reg(key, value);
+                run_kb_reg(key, value, kb_reg_path);
             }
 
-            run_kb_reg(".", "");
+            run_kb_reg(".", "", kb_reg_path);
             info("Initialized keyboard");
         }
 
