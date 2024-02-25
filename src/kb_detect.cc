@@ -7,13 +7,12 @@
 #include <unistd.h>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/cfg/env.h>
 #include <libusb.h>
 #include <toml++/toml.hpp>
 
 #include "utf8util.h"
-
-// from libusb/libusb/descriptor.c
-#define DESC_HEADER_LENGTH 2
+#include "reg.h"
 
 using namespace std;
 using namespace std::filesystem;
@@ -21,8 +20,6 @@ using namespace fmt;
 using namespace spdlog;
 
 volatile bool exit_flag{false};
-
-const string default_kb_reg_path{"/usr/local/bin/kb_reg"};
 
 void handle_signal(int sig) {
    // INT can be issued from a terminal only
@@ -34,78 +31,6 @@ void handle_signal(int sig) {
    if (sig == SIGTERM) {
       exit_flag=true;
    }
-}
-
-struct string_descriptor {
-    uint8_t  bLength;
-    uint8_t  bDescriptorType;
-    uint16_t wData[255]; // Make this a complete type.
-} LIBUSB_PACKED;
-
-union string_desc_buf {
-        struct string_descriptor desc;
-        uint8_t buf[255];       /* Some devices choke on size > 255 */
-        uint16_t align;         /* Force 2-byte alignment */
-};
-
-pair<int, string> get_utf8_string(libusb_device_handle *handle, uint8_t id)
-{
-    /* Asking for the zero'th index is special - it returns a string
-     * descriptor that contains all the language IDs supported by the
-     * device. Typically there aren't many - often only one. Language
-     * IDs are 16 bit numbers, and they start at the third byte in the
-     * descriptor. There's also no point in trying to read descriptor 0
-     * with this function. See USB 2.0 specification section 9.6.7 for
-     * more information.
-     */
-
-    if (id == 0)
-        return pair(LIBUSB_ERROR_INVALID_PARAM, nullptr);
-
-    string_desc_buf str;
-    int r = libusb_get_string_descriptor(handle, 0, 0, str.buf, 4);
-    if (r < 0)
-        return pair(r, nullptr);
-    else if (r != 4 || str.desc.bLength < 4)
-        return pair(LIBUSB_ERROR_IO, nullptr);
-    else if (str.desc.bDescriptorType != LIBUSB_DT_STRING)
-        return pair(LIBUSB_ERROR_IO, nullptr);
-    else if (str.desc.bLength & 1)
-        warn("suspicious bLength %u for language ID string descriptor", str.desc.bLength);
-
-    // en-US: 0x0409
-    //uint16_t langid = 0x0409;
-    uint16_t langid = libusb_le16_to_cpu(str.desc.wData[0]);
-    debug("String ID {} returned langid 0x{:04x}", id, langid);
-
-    r = libusb_get_string_descriptor(handle, id, langid, str.buf, sizeof(str.buf));
-    if (r < 0)
-        return pair(r, nullptr);
-    else if (r < DESC_HEADER_LENGTH || str.desc.bLength > r)
-        return pair(LIBUSB_ERROR_IO, nullptr);
-    else if (str.desc.bDescriptorType != LIBUSB_DT_STRING)
-        return pair(LIBUSB_ERROR_IO, nullptr);
-    else if ((str.desc.bLength & 1) || str.desc.bLength != r)
-        warn("suspicious bLength %u for string descriptor (read %d)", str.desc.bLength, r);
-
-    /* The descriptor has this number of wide characters */
-    int src_max = (str.desc.bLength - 1 - 1) / 2;
-
-    wchar_t wbuffer[256];
-    for (int i = 0; i<src_max; ++i) {
-        wbuffer[i] = libusb_le16_to_cpu(str.desc.wData[i]);
-    }
-
-    wstring wstr(wbuffer, src_max);
-
-    return pair(0, u8enc(wstr));
-}
-
-string get_ascii_string(libusb_device_handle *handle, uint8_t id)
-{
-    unsigned char data[256];
-    size_t bytes_loaded = libusb_get_string_descriptor_ascii(handle, id, data, sizeof(data));
-    return string(reinterpret_cast<char*>(data), bytes_loaded);
 }
 
 bool is_custom_keyboard(toml::table tbl, int vendor_id, int product_id)
@@ -131,55 +56,42 @@ string get_log_path() {
     return format("{}/.local/log/kb_detect.log", getenv("HOME"));
 }
 
-void run_kb_reg(const string &key, const string &value, const string &kb_reg_path, int vendor_id, int product_id) {
-    string cmd = format("printf '{}' | {} -k {} -v {} -p {}", value.c_str(), kb_reg_path, key, vendor_id, product_id);
-
-    int ret = system(cmd.c_str());
-    if (ret != 0) {
-        error("Error running: {}", cmd);
-    }
-}
-
-void configure_keyboard(toml::table &tbl, libusb_device *dev, struct libusb_device_descriptor &desc) {
-    libusb_device_handle *handle = nullptr;
-    int rc = libusb_open(dev, &handle);
-    if (LIBUSB_SUCCESS != rc) {
-        error("No access to device: {}", libusb_strerror((enum libusb_error)rc));
+void configure_keyboard(toml::table &tbl, struct libusb_device_descriptor &desc) {
+    if (hid_init()) {
+        error("Could not initialize hid");
         return;
     }
 
-    int err;
-    string vendor, product;
+    hid_device *raw_dev = open_raw(desc.idVendor, desc.idProduct);
 
-    tie(err, vendor) = get_utf8_string(handle, desc.iManufacturer);
-    if (err != 0) {
-        error("Error getting vendor");
+    if (!raw_dev) {
+        error("Unable to find raw interface to device {:04x}:{:04x}", desc.idVendor, desc.idProduct);
+
+        /* Free static HIDAPI objects. */
+        hid_exit();
         return;
     }
 
-    tie(err, product) = get_utf8_string(handle, desc.iProduct);
-    if (err != 0) {
-        error("Error getting product");
-        return;
-    }
+    std::string vendor = u8enc(get_vendor(raw_dev));
+    std::string product = u8enc(get_product(raw_dev));
 
-    libusb_close(handle);
-
-
-    string kb_reg_path = default_kb_reg_path;
-    if (!!tbl["kb_reg_path"]) {
-        kb_reg_path = tbl["kb_reg_path"].value<std::string>().value();
-    }
+    hid_set_nonblocking(raw_dev, 1);
 
     auto keys = tbl["keys"].as_table();
     for (auto pair : *keys) {
         string key = string(pair.first.str());
-        string value = pair.second.value_or(""s);
+        string data = pair.second.value_or(""s);
 
-        run_kb_reg(key, value, kb_reg_path, desc.idVendor, desc.idProduct);
+        set_key(raw_dev, key);
+        store_data(raw_dev, data);
     }
 
-    run_kb_reg(".", "", kb_reg_path, desc.idVendor, desc.idProduct);
+    set_key(raw_dev, ".");
+
+    hid_close(raw_dev);
+
+    /* Free static HIDAPI objects. */
+    hid_exit();
 
     info("Initialized {} from {}", product, vendor);
 }
@@ -200,7 +112,7 @@ void configure_if_connected(libusb_context *usb_ctx) {
 
         auto tbl = toml::parse_file(get_config_path());
         if (is_custom_keyboard(tbl, desc.idVendor, desc.idProduct)) {
-            configure_keyboard(tbl, usb_devices[i], desc);
+            configure_keyboard(tbl, desc);
         }
 
     }
@@ -228,7 +140,7 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
     toml::table tbl = toml::parse_file(get_config_path());
 
     if (is_custom_keyboard(tbl, desc.idVendor, desc.idProduct)) {
-        configure_keyboard(tbl, dev, desc);
+        configure_keyboard(tbl, desc);
     }
 
     return 0;
@@ -254,27 +166,35 @@ int main(int argc, char *argv[])
         std::freopen(logpath.c_str(), "w", stdout);
     }
 
+    spdlog::cfg::load_env_levels();
+
+    debug("Registering Signal Handlers");
     signal(SIGTERM, handle_signal);
     signal(SIGINT, handle_signal);
 
+    debug("Checking HID Version");
+    hid_version_check();
+
     libusb_hotplug_callback_handle hp[2];
     int product_id{0}, vendor_id{0}, class_id{0};
-    int rc;
 
     vendor_id  = (argc > 1) ? (int)strtol (argv[1], nullptr, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
     product_id = (argc > 2) ? (int)strtol (argv[2], nullptr, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 
+    debug("Initializing USB Library");
     libusb_context *usb_ctx;
     // Eventually, this needs to be replaced with libusb_init_context
-    rc = libusb_init(&usb_ctx);
+    int rc = libusb_init(&usb_ctx);
     if (LIBUSB_SUCCESS != rc)
     {
         error("failed to initialise libusb: {}", libusb_strerror((enum libusb_error)rc));
         return EXIT_FAILURE;
     }
 
+    debug("Configuring currently attached keyboards");
     configure_if_connected(usb_ctx);
 
+    debug("Starting USB Listener");
     if (!libusb_has_capability (LIBUSB_CAP_HAS_HOTPLUG)) {
         error("Hotplug capabilities are not supported on this platform");
         libusb_exit(nullptr);

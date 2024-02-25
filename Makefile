@@ -28,8 +28,8 @@ clean:
 %.o: %.cc
 	$(CC) $(OUTPUT_OPTION) $(CXXFLAGS) -c $< $(DEPFLAGS)
 
-kb_detect: src/kb_detect.o src/utf8util.o
+kb_detect: src/kb_detect.o src/reg.o src/hidutil.o src/utf8util.o
 	$(CC) $(OUTPUT_OPTION) $(LDFLAGS) $^ $(DEPFLAGS)
 
-kb_reg: src/kb_reg.o src/utf8util.o
+kb_reg: src/kb_reg.o src/reg.o src/hidutil.o src/utf8util.o
 	$(CC) $(OUTPUT_OPTION) $(LDFLAGS) $^ $(DEPFLAGS)
