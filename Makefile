@@ -21,9 +21,9 @@ uninstall:
 	$(RM) $(bindir)/kb_reg
 
 clean:
-	rm src/*.o
-	rm kb_detect
-	rm kb_reg
+	rm -f src/*.o
+	rm -f kb_detect
+	rm -f kb_reg
 
 %.o: %.cc
 	$(CC) $(OUTPUT_OPTION) $(CXXFLAGS) -c $< $(DEPFLAGS)
