@@ -71,9 +71,20 @@ Create `.kb_detect.toml`
 # Otherwise kb_detect will default to /usr/local/bin/kb_reg
 # kb_reg_path = "/usr/bin/kb_reg"
 
+# Slice65 from Pizzakeyboards
 [[keyboards]]
 vendor = 0x504b
 product = 0x707c
+
+# kbd67mkiirgb v3 from KBDfans
+[[keyboards]]
+vendor = 0x4b42
+product = 0x1226
+
+# nemui from Bachoo
+[[keyboards]]
+vendor = 0x6400
+product = 0x2371
 
 [keys]
 e = "jdoe@server.com"
@@ -83,6 +94,8 @@ d = """
 Text followed by enter
 """
 ```
+
+If you don't know your keyboard's vendor and product ids, you can plugin the keyboard while `qmk console` is running.  You can also check the log of `~/.local/log/kb_detect.log` while kb_detect is running.
 
 ### LaunchAgent
 
