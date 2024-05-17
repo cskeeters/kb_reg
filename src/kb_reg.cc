@@ -36,6 +36,20 @@ string read_all(FILE *fp) {
     return ss.str();
 }
 
+// The keyboard will process \ as an escape character
+string escape(string str) {
+    stringstream ss;
+    for (size_t i=0; i<str.length(); ++i) {
+        char c = str[i];
+        if (c == '\\') {
+            ss << "\\\\";
+        } else {
+            ss << c;
+        }
+    }
+    return ss.str();
+}
+
 int main(int argc, char* argv[])
 {
     int exit_status = 0;
@@ -51,12 +65,14 @@ int main(int argc, char* argv[])
     cxxopts::Options options(argv[0], "Used to write data to a register in a custom keyboard using raw hid");
 
     string key;
+    bool raw;
     int vendor_id{0};
     int product_id{0};
 
     options.add_options()
         ("h,help", "displays help text")
         ("k,key", "specifies register", cxxopts::value(key)->default_value(""))
+        ("r,raw", "Escapes \\ characters", cxxopts::value(raw))
         ("v,vendor", "specifies vendor id", cxxopts::value(vendor_id))
         ("p,product", "specifies product id", cxxopts::value(product_id))
         ;
@@ -92,6 +108,11 @@ int main(int argc, char* argv[])
         }
     }
 
+    if (raw) {
+        cout << "Escaping data (" << data << ")" << endl;
+        data = escape(data);
+        cout << "Data: " << data << endl;
+    }
 
     hid_version_check();
 
