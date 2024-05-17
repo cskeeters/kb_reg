@@ -124,11 +124,15 @@ Then run:
 
     launchctl load -w ~/Library/LaunchAgents/com.github.cskeeters.kb_detect.plist
 
+Stop kb_detect
+
+    launchctl unload ~/Library/LaunchAgents/com.github.cskeeters.kb_detect.plist
+
 ## Uninstall
 
 Remove the LaunchAgent:
 
-    launchctl unload -w ~/Library/LaunchAgents/com.github.cskeeters.kb_detect.plist
+    launchctl unload ~/Library/LaunchAgents/com.github.cskeeters.kb_detect.plist
     rm -f ~/Library/LaunchAgents/com.github.cskeeters.kb_detect.plist
 
 You can use make to remove the code:
