@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
 
     if (!isatty(fileno(stdout))) {
         // configure spdlog to write to this logfile
-        string logpath = format("{}/.local/log/kb_reg.log", getenv("HOME"));
+        string logpath = fmt::format("{}/.local/log/kb_reg.log", getenv("HOME"));
         std::freopen(logpath.c_str(), "a", stdout);
     }
 

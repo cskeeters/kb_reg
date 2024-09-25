@@ -53,7 +53,7 @@ string get_config_path() {
 }
 
 string get_log_path() {
-    return format("{}/.local/log/kb_detect.log", getenv("HOME"));
+    return fmt::format("{}/.local/log/kb_detect.log", getenv("HOME"));
 }
 
 void configure_keyboard(toml::table &tbl, struct libusb_device_descriptor &desc) {
@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
 
     string log_folder_path = path(get_log_path()).parent_path();
     if (!exists(log_folder_path)) {
-        cout << format("You must run: mkdir -p {}", log_folder_path) << endl;
+        cout << fmt::format("You must run: mkdir -p {}", log_folder_path) << endl;
         return 1;
     }
 
