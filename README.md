@@ -48,7 +48,7 @@ Installation requires
 
 Install the small libraries first:
 
-    brew install libusb hidapi tomlplusplus cxxargs spdlog
+    brew install libusb hidapi tomlplusplus cxxargs spdlog fmt
 
 NOTE: This program also depends on [UTF8-CPP](https://github.com/nemtrif/utfcpp), but since it's a header-only library, I just included it in the source code.
 
