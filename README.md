@@ -124,9 +124,32 @@ Then run:
 
     launchctl load -w ~/Library/LaunchAgents/com.github.cskeeters.kb_detect.plist
 
-Stop kb_detect
+Stop `kb_detect`
 
     launchctl unload ~/Library/LaunchAgents/com.github.cskeeters.kb_detect.plist
+
+#### Troubleshooting
+
+Determine if the program is running
+
+```sh
+ps aux | grep kb_detect
+```
+
+If it's not running, try to run it manually.
+
+```sh
+/usr/local/bin/kb_detect
+```
+
+It could be that `kb_detect` requires a version of a library no longer installed on the system.  If so, recompile and reinstall.
+
+If it runs, press `Ctrl+c` and try to start it manually.
+
+When the program can't run due to a non-existent dependency, `launchctl load` will output the following, which is not terribly helpful.
+
+> Load failed: 5: Input/output error
+
 
 ## Uninstall
 
