@@ -2,3 +2,4 @@ kb_detect
 kb_reg
 src/*.o
 compile_commands.json
+.cache
